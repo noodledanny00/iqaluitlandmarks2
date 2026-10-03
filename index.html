@@ -1,447 +1,318 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Iqaluit Landmarks Map</title>
-    
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- FontAwesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- Leaflet CSS & JS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
-    <!-- Microsoft MSAL SDK -->
-    <script src="https://alcdn.msauth.net/browser/2.35.0/js/msal-browser.min.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Iqaluit Landmarks Map & Guide</title>
 
-    <style>
-        #map { height: calc(100vh - 65px); width: 100%; }
-    </style>
+  <!-- Leaflet CSS -->
+  <link 
+    rel="stylesheet" 
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" 
+    crossorigin="" 
+  />
+
+  <style>
+    :root {
+      --primary: #005f73;
+      --secondary: #0a9396;
+      --accent: #ee9b00;
+      --bg: #f8f9fa;
+      --card-bg: #ffffff;
+      --text: #2b2d42;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      padding: 30px 20px;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      color: white;
+      border-radius: 12px;
+      margin-bottom: 25px;
+    }
+
+    header h1 {
+      font-size: 2.2rem;
+      margin-bottom: 6px;
+    }
+
+    /* MAP CONTAINER */
+    #map-wrapper {
+      position: sticky;
+      top: 10px;
+      z-index: 1000;
+      margin-bottom: 30px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    #map {
+      height: 380px;
+      width: 100%;
+    }
+
+    .category-section {
+      margin-bottom: 35px;
+    }
+
+    .category-title {
+      font-size: 1.6rem;
+      color: var(--primary);
+      border-bottom: 3px solid var(--accent);
+      display: inline-block;
+      margin-bottom: 15px;
+      padding-bottom: 4px;
+    }
+
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 18px;
+    }
+
+    .card {
+      background-color: var(--card-bg);
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      border: 2px solid transparent;
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
+      border-color: var(--secondary);
+    }
+
+    .card h3 {
+      font-size: 1.2rem;
+      color: var(--secondary);
+      margin-bottom: 8px;
+    }
+
+    .card p {
+      font-size: 0.92rem;
+      color: #555;
+    }
+
+    .tag {
+      display: inline-block;
+      margin-top: 12px;
+      padding: 4px 10px;
+      font-size: 0.78rem;
+      font-weight: bold;
+      border-radius: 20px;
+      background-color: #e9ecef;
+      color: var(--primary);
+      width: fit-content;
+    }
+
+    footer {
+      text-align: center;
+      padding: 20px;
+      margin-top: 30px;
+      color: #777;
+      font-size: 0.85rem;
+    }
+  </style>
 </head>
-<body class="bg-slate-900 text-slate-100 flex flex-col h-screen overflow-hidden font-sans">
+<body>
 
-    <!-- HEADER / NAVBAR -->
-    <header class="h-[65px] bg-slate-950 border-b border-slate-800 px-4 flex items-center justify-between z-10 shrink-0">
-        <div class="flex items-center gap-3">
-            <i class="fa-solid fa-map-location-dot text-cyan-400 text-2xl"></i>
-            <h1 class="text-lg font-bold text-slate-100 tracking-wide">Iqaluit Landmarks</h1>
-        </div>
-        
-        <div class="flex items-center gap-3">
-            <button onclick="handleAddPlaceClick()" class="bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-1.5 transition">
-                <i class="fa-solid fa-plus"></i> Add Landmark
-            </button>
-            <button onclick="handleAuthClick()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium px-3 py-2 rounded-lg border border-slate-700 flex items-center gap-2 transition">
-                <i class="fa-brands fa-microsoft text-cyan-400"></i>
-                <span id="auth-user-label">Sign In</span>
-            </button>
-        </div>
+  <div class="container">
+    <header>
+      <h1>📍 Iqaluit Landmarks & Local Guide</h1>
+      <p>Explore cinema, schools, local foods, and essential stores in Nunavut's capital.</p>
     </header>
 
-    <!-- MAIN CONTENT AREA -->
-    <div class="flex-1 flex flex-col md:flex-row overflow-hidden relative">
-        
-        <!-- SIDEBAR -->
-        <aside class="w-full md:w-80 bg-slate-900 border-r border-slate-800 flex flex-col z-10 h-1/2 md:h-full shrink-0">
-            <!-- Search & Filters -->
-            <div class="p-3 border-b border-slate-800 space-y-2">
-                <div class="relative">
-                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-500 text-xs"></i>
-                    <input type="text" id="search-input" onkeyup="filterLandmarks()" placeholder="Search places..." 
-                           class="w-full bg-slate-950 border border-slate-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500">
-                </div>
-                
-                <div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
-                    <button id="tab-all" onclick="setCategoryFilter('all')" class="filter-tab px-3 py-1 rounded-lg bg-cyan-600 text-white font-medium shrink-0 transition">All</button>
-                    <button id="tab-sight" onclick="setCategoryFilter('sight')" class="filter-tab px-3 py-1 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 font-medium shrink-0 transition">Sights</button>
-                    <button id="tab-snack" onclick="setCategoryFilter('snack')" class="filter-tab px-3 py-1 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 font-medium shrink-0 transition">Snacks & Coffee</button>
-                </div>
-            </div>
-
-            <!-- List of Places -->
-            <div id="landmark-list" class="flex-1 overflow-y-auto p-3 space-y-2">
-                <!-- Dynamically rendered cards -->
-            </div>
-        </aside>
-
-        <!-- MAP CONTAINER -->
-        <main class="flex-1 relative h-1/2 md:h-full">
-            <div id="map"></div>
-        </main>
+    <!-- CARTO BASEMAP MAP -->
+    <div id="map-wrapper">
+      <div id="map"></div>
     </div>
 
-    <!-- MODAL: AUTHENTICATION / SIGN IN -->
-    <div id="auth-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-slate-900 border border-slate-800 rounded-xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl">
-            <i class="fa-brands fa-microsoft text-cyan-400 text-4xl"></i>
-            <h3 class="text-lg font-bold text-slate-100">Sign in with Microsoft</h3>
-            <p class="text-xs text-slate-400">You must sign in with a Microsoft account to add new landmarks or update photos.</p>
-            <div class="flex gap-2 justify-center pt-2">
-                <button onclick="closeAuthModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold">Cancel</button>
-                <button onclick="loginWithMicrosoft()" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-semibold">Sign In</button>
-            </div>
+    <!-- MOVIES & ARTS -->
+    <section class="category-section">
+      <h2 class="category-title">🎬 Movies & Arts</h2>
+      <div class="card-grid">
+        <div class="card" onclick="flyToLocation(63.7485, -68.5181)">
+          <div>
+            <h3>Astro Theatre</h3>
+            <p>Iqaluit’s iconic cinema showing current blockbusters with two screens for cold winter nights.</p>
+          </div>
+          <span class="tag">Entertainment</span>
         </div>
-    </div>
-
-    <!-- MODAL: ADD LANDMARK -->
-    <div id="add-place-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-slate-900 border border-slate-800 rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl">
-            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
-                <h3 class="text-sm font-bold text-slate-100">Add New Landmark</h3>
-                <button onclick="closeAddModal()" class="text-slate-500 hover:text-slate-300"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-            <form onsubmit="addNewPlace(event)" class="space-y-3 text-xs">
-                <div>
-                    <label class="block text-slate-400 mb-1">Name</label>
-                    <input type="text" id="add-name" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-cyan-500">
-                </div>
-                <div>
-                    <label class="block text-slate-400 mb-1">Category</label>
-                    <select id="add-category" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-cyan-500">
-                        <option value="sight">Sight / Attraction</option>
-                        <option value="snack">Snack & Coffee Spot</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-slate-400 mb-1">Address / Location Description</label>
-                    <input type="text" id="add-address" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-cyan-500">
-                </div>
-                <div class="grid grid-cols-2 gap-2">
-                    <div>
-                        <label class="block text-slate-400 mb-1">Latitude</label>
-                        <input type="number" step="any" id="add-lat" required placeholder="63.7467" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-cyan-500">
-                    </div>
-                    <div>
-                        <label class="block text-slate-400 mb-1">Longitude</label>
-                        <input type="number" step="any" id="add-lng" required placeholder="-68.5170" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-cyan-500">
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-slate-400 mb-1">Image URL</label>
-                    <input type="url" id="add-img" placeholder="https://..." class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-cyan-500">
-                </div>
-                <div class="flex justify-end gap-2 pt-3 border-t border-slate-800">
-                    <button type="button" onclick="closeAddModal()" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg font-semibold">Cancel</button>
-                    <button type="submit" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-semibold">Save Landmark</button>
-                </div>
-            </form>
+        <div class="card" onclick="flyToLocation(63.7450, -68.5130)">
+          <div>
+            <h3>Isuma Arts & Culture Center</h3>
+            <p>Hub for traditional Inuit drum dancing, throat singing, and independent Northern film screenings.</p>
+          </div>
+          <span class="tag">Culture & Arts</span>
         </div>
-    </div>
+      </div>
+    </section>
 
-    <!-- MODAL: CHANGE IMAGE -->
-    <div id="change-image-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-slate-900 border border-slate-800 rounded-xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
-            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
-                <h3 class="text-sm font-bold text-slate-100">Update Landmark Photo</h3>
-                <button onclick="closeChangeImageModal()" class="text-slate-500 hover:text-slate-300"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-            <div class="space-y-3 text-xs">
-                <div>
-                    <label class="block text-slate-400 mb-1">Enter Image URL</label>
-                    <input type="url" id="modal-image-url" placeholder="https://..." class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-cyan-500">
-                </div>
-                <div class="text-center text-slate-500 text-[10px] uppercase font-bold tracking-wider">— OR —</div>
-                <div>
-                    <label class="block text-slate-400 mb-1">Upload File</label>
-                    <input type="file" accept="image/*" onchange="processImageFileChange(event)" class="w-full text-slate-400 text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-slate-800 file:text-slate-200 hover:file:bg-slate-700">
-                </div>
-            </div>
-            <div class="flex justify-end gap-2 pt-3 border-t border-slate-800 text-xs">
-                <button onclick="closeChangeImageModal()" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg font-semibold">Cancel</button>
-                <button onclick="saveImageChangeFromModal()" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-semibold">Update Image</button>
-            </div>
+    <!-- SCHOOLS -->
+    <section class="category-section">
+      <h2 class="category-title">🏫 Schools & Education</h2>
+      <div class="card-grid">
+        <div class="card" onclick="flyToLocation(63.7540, -68.5110)">
+          <div>
+            <h3>Inuksuk High School</h3>
+            <p>Primary high school famous for cultural workshops, Inuktitut language programs, and community events.</p>
+          </div>
+          <span class="tag">High School</span>
         </div>
-    </div>
+        <div class="card" onclick="flyToLocation(63.7502, -68.5205)">
+          <div>
+            <h3>Nunavut Arctic College (NAC)</h3>
+            <p>The main post-secondary campus offering Inuktitut studies, nursing, law, trades, and Arctic research.</p>
+          </div>
+          <span class="tag">College</span>
+        </div>
+        <div class="card" onclick="flyToLocation(63.7490, -68.5140)">
+          <div>
+            <h3>Joamie Elementary School</h3>
+            <p>Local elementary school serving young learners with bilingual Inuktitut-English education.</p>
+          </div>
+          <span class="tag">Elementary</span>
+        </div>
+      </div>
+    </section>
 
-    <!-- APP SCRIPT -->
-    <script>
-        const msalConfig = {
-            auth: {
-                clientId: "a2335a85-a5ec-4061-97f9-4e1807b76793",
-                authority: "https://login.microsoftonline.com/common",
-                redirectUri: "https://noodledanny00.github.io/iqaluitlandmarks2/"
-            },
-            cache: { cacheLocation: "localStorage" }
-        };
+    <!-- FOODS -->
+    <section class="category-section">
+      <h2 class="category-title">🍲 Local Foods & Dining</h2>
+      <div class="card-grid">
+        <div class="card" onclick="flyToLocation(63.7460, -68.5150)">
+          <div>
+            <h3>Country Food Market</h3>
+            <p>Traditional Inuit cuisine sourced locally: fresh Arctic Char, seal meat, caribou, and maktaaq.</p>
+          </div>
+          <span class="tag">Traditional</span>
+        </div>
+        <div class="card" onclick="flyToLocation(63.7472, -68.5168)">
+          <div>
+            <h3>The Black Heart Cafe</h3>
+            <p>A favorite local hangout offering fresh coffee, paninis, soups, and homemade baked goods.</p>
+          </div>
+          <span class="tag">Café</span>
+        </div>
+        <div class="card" onclick="flyToLocation(63.7465, -68.5180)">
+          <div>
+            <h3>The Granite Room</h3>
+            <p>Fine dining at the Discovery Hotel featuring local wild game like caribou tenderloin and Arctic Char.</p>
+          </div>
+          <span class="tag">Dining</span>
+        </div>
+      </div>
+    </section>
 
-        const msalInstance = new msal.PublicClientApplication(msalConfig);
-        let currentUser = null;
-        let markersGroup = [];
-        let activeMarker = null;
-        let currentCategory = 'all';
-        let targetLandmarkIdForImage = null;
+    <!-- STORES -->
+    <section class="category-section">
+      <h2 class="category-title">🛒 Stores & Shopping</h2>
+      <div class="card-grid">
+        <div class="card" onclick="flyToLocation(63.7478, -68.5195)">
+          <div>
+            <h3>NorthMart</h3>
+            <p>The largest general store in Iqaluit with fresh groceries, clothing, hardware, and outdoor supplies.</p>
+          </div>
+          <span class="tag">Grocery & General</span>
+        </div>
+        <div class="card" onclick="flyToLocation(63.7455, -68.5162)">
+          <div>
+            <h3>Arctic Ventures (DJ's)</h3>
+            <p>Long-standing local supermarket and hardware store for everyday household needs.</p>
+          </div>
+          <span class="tag">Retail</span>
+        </div>
+        <div class="card" onclick="flyToLocation(63.7448, -68.5145)">
+          <div>
+            <h3>Caribou House Fine Arts</h3>
+            <p>Shops offering authentic Inuit soapstone carvings, parkas, prints, and handcrafted northern jewelry.</p>
+          </div>
+          <span class="tag">Art & Crafts</span>
+        </div>
+      </div>
+    </section>
 
-        // Leaflet Custom Icons
-        const defaultIcon = L.icon({
-            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
-            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-            iconSize: [25, 41],
-            iconAnchor: [12, 41],
-            popupAnchor: [1, -34],
-            shadowSize: [41, 41]
-        });
+    <footer>
+      <p>Built with CARTO Basemaps & Leaflet JS • Iqaluit, Nunavut</p>
+    </footer>
+  </div>
 
-        const selectedIcon = L.icon({
-            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-            iconSize: [25, 41],
-            iconAnchor: [12, 41],
-            popupAnchor: [1, -34],
-            shadowSize: [41, 41]
-        });
+  <!-- Leaflet JS -->
+  <script 
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" 
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" 
+    crossorigin="">
+  </script>
 
-        // Default Landmark Data
-        const defaultLandmarks = [
-            { id: 1, name: "Black Heart Café", category: "snack", address: "Building 756, Iqaluit, NU", lat: 63.7461, lng: -68.5173, img: "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb" },
-            { id: 2, name: "Frobisher Inn / Caribou House", category: "snack", address: "Astro Hill Complex, Iqaluit, NU", lat: 63.7475, lng: -68.5141, img: "https://images.unsplash.com/photo-1566073771259-6a8506099945" },
-            { id: 3, name: "Astro Theatre", category: "sight", address: "Astro Hill Complex, Iqaluit, NU", lat: 63.7478, lng: -68.5144, img: "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba" },
-            { id: 4, name: "CBC Nunavut", category: "sight", address: "Building 224, Iqaluit, NU", lat: 63.7452, lng: -68.5155, img: "https://images.unsplash.com/photo-1585829365295-ab7cd400c167" },
-            { id: 5, name: "Northmart", category: "snack", address: "Aqqaluk Rd, Iqaluit, NU", lat: 63.7481, lng: -68.5189, img: "https://images.unsplash.com/photo-1578916171728-46686eac8d58" },
-            { id: 6, name: "Legislative Assembly of Nunavut", category: "sight", address: "926 Unikkaarvik Rd", lat: 63.7495, lng: -68.5162, img: "https://images.unsplash.com/photo-1541872703-74c5e44368f9" },
-            { id: 7, name: "Unikkaarvik Visitor Centre", category: "sight", address: "220 Unikkaarvik Rd", lat: 63.7438, lng: -68.5150, img: "https://images.unsplash.com/photo-1526778548025-fa2f459cd5c1" },
-            { id: 8, name: "St. Jude's Anglican Cathedral", category: "sight", address: "Mattaaq St", lat: 63.7463, lng: -68.5147, img: "https://images.unsplash.com/photo-1548625149-fc4a29cf7092" }
-        ];
+  <script>
+    // Initialize map centered at Iqaluit coordinates
+    const map = L.map('map').setView([63.7467, -68.5170], 14);
 
-        let landmarks = JSON.parse(localStorage.getItem('iqaluit_landmarks')) || defaultLandmarks;
+    // CARTO Voyager Tile Layer with your API Key
+    const apiKey = 'cb1_3mop_1_09d5aeb377057e938b4ee356';
+    const cartoVoyager = L.tileLayer(
+      `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?api_key=${apiKey}`, 
+      {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        subdomains: 'abcd',
+        maxZoom: 19
+      }
+    ).addTo(map);
 
-        // Initialize MSAL Authentication
-        msalInstance.initialize().then(() => {
-            const accounts = msalInstance.getAllAccounts();
-            if (accounts.length > 0) {
-                currentUser = accounts[0];
-            }
-            updateUIForUser();
-        });
+    // Landmark Data Array
+    const landmarks = [
+      { name: "Astro Theatre", lat: 63.7485, lng: -68.5181, desc: "Movie Cinema" },
+      { name: "Isuma Arts Center", lat: 63.7450, lng: -68.5130, desc: "Arts & Culture Hub" },
+      { name: "Inuksuk High School", lat: 63.7540, lng: -68.5110, desc: "High School" },
+      { name: "Nunavut Arctic College", lat: 63.7502, lng: -68.5205, desc: "Post-Secondary College" },
+      { name: "Joamie Elementary School", lat: 63.7490, lng: -68.5140, desc: "Elementary School" },
+      { name: "Country Food Market", lat: 63.7460, lng: -68.5150, desc: "Traditional Inuit Foods" },
+      { name: "The Black Heart Cafe", lat: 63.7472, lng: -68.5168, desc: "Coffee & Bakery" },
+      { name: "The Granite Room", lat: 63.7465, lng: -68.5180, desc: "Fine Dining Restaurant" },
+      { name: "NorthMart", lat: 63.7478, lng: -68.5195, desc: "Grocery & General Store" },
+      { name: "Arctic Ventures", lat: 63.7455, lng: -68.5162, desc: "Supermarket & Hardware" },
+      { name: "Caribou House Fine Arts", lat: 63.7448, lng: -68.5145, desc: "Local Crafts & Carvings" }
+    ];
 
-        function handleAddPlaceClick() {
-            if (!currentUser) { openAuthModal(); } else { openAddModal(); }
-        }
+    // Add Markers to Map
+    landmarks.forEach(spot => {
+      L.marker([spot.lat, spot.lng])
+        .addTo(map)
+        .bindPopup(`<b>${spot.name}</b><br>${spot.desc}`);
+    });
 
-        function handleAuthClick() {
-            if (currentUser) {
-                msalInstance.logoutPopup().then(() => {
-                    currentUser = null;
-                    updateUIForUser();
-                });
-            } else {
-                loginWithMicrosoft();
-            }
-        }
-
-        async function loginWithMicrosoft() {
-            try {
-                const loginResponse = await msalInstance.loginPopup({ scopes: ["User.Read"] });
-                currentUser = loginResponse.account;
-                updateUIForUser();
-                closeAuthModal();
-
-                if (targetLandmarkIdForImage) {
-                    openChangeImageModal();
-                } else {
-                    openAddModal();
-                }
-            } catch (error) {
-                console.error("Microsoft Login Error:", error);
-            }
-        }
-
-        function updateUIForUser() {
-            const authLabel = document.getElementById('auth-user-label');
-            authLabel.innerText = currentUser ? (currentUser.name || "Signed In") : "Sign In";
-        }
-
-        function openAuthModal() { document.getElementById('auth-modal').classList.remove('hidden'); }
-        function closeAuthModal() { document.getElementById('auth-modal').classList.add('hidden'); }
-        function openAddModal() { document.getElementById('add-place-modal').classList.remove('hidden'); }
-        function closeAddModal() { document.getElementById('add-place-modal').classList.add('hidden'); }
-
-        function triggerImageChange(landmarkId, event) {
-            if (event) event.stopPropagation();
-            targetLandmarkIdForImage = landmarkId;
-
-            if (!currentUser) {
-                openAuthModal();
-            } else {
-                openChangeImageModal();
-            }
-        }
-
-        function openChangeImageModal() {
-            document.getElementById('modal-image-url').value = '';
-            document.getElementById('change-image-modal').classList.remove('hidden');
-        }
-
-        function closeChangeImageModal() {
-            document.getElementById('change-image-modal').classList.add('hidden');
-            targetLandmarkIdForImage = null;
-        }
-
-        function saveImageChangeFromModal() {
-            const newUrl = document.getElementById('modal-image-url').value.trim();
-            if (newUrl && targetLandmarkIdForImage) {
-                updateLandmarkImage(targetLandmarkIdForImage, newUrl);
-                closeChangeImageModal();
-            }
-        }
-
-        function processImageFileChange(event) {
-            const file = event.target.files[0];
-            if (file && targetLandmarkIdForImage) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    updateLandmarkImage(targetLandmarkIdForImage, e.target.result);
-                    closeChangeImageModal();
-                };
-                reader.readAsDataURL(file);
-            }
-            event.target.value = '';
-        }
-
-        function updateLandmarkImage(landmarkId, newImgSrc) {
-            const place = landmarks.find(p => p.id === landmarkId);
-            if (place) {
-                place.img = newImgSrc;
-                saveLandmarksToStorage();
-                renderLandmarks();
-            }
-        }
-
-        // Initialize Map
-        const map = L.map('map').setView([63.7467, -68.5170], 14);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
-
-        map.on('popupclose', () => {
-            if (activeMarker) {
-                activeMarker.setIcon(defaultIcon);
-                activeMarker = null;
-            }
-        });
-
-        function saveLandmarksToStorage() {
-            localStorage.setItem('iqaluit_landmarks', JSON.stringify(landmarks));
-        }
-
-        function addNewPlace(event) {
-            event.preventDefault();
-            const newPlace = {
-                id: Date.now(),
-                name: document.getElementById('add-name').value,
-                category: document.getElementById('add-category').value,
-                img: document.getElementById('add-img').value || 'https://images.unsplash.com/photo-1517411032315-54ef2cb783bb',
-                address: document.getElementById('add-address').value,
-                lat: parseFloat(document.getElementById('add-lat').value),
-                lng: parseFloat(document.getElementById('add-lng').value)
-            };
-            landmarks.push(newPlace);
-            saveLandmarksToStorage();
-            closeAddModal();
-            renderLandmarks();
-        }
-
-        function setCategoryFilter(category) {
-            currentCategory = category;
-            document.querySelectorAll('.filter-tab').forEach(btn => {
-                btn.className = "filter-tab px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 font-medium shrink-0 transition";
-            });
-            const activeTab = document.getElementById(`tab-${category}`);
-            if (activeTab) {
-                activeTab.className = "filter-tab px-3 py-1.5 rounded-lg bg-cyan-600 text-white font-medium shrink-0 transition";
-            }
-            renderLandmarks();
-        }
-
-        function renderLandmarks() {
-            const list = document.getElementById('landmark-list');
-            list.innerHTML = '';
-
-            markersGroup.forEach(marker => map.removeLayer(marker));
-            markersGroup = [];
-
-            const filteredLandmarks = landmarks.filter(place => {
-                if (currentCategory === 'all') return true;
-                return (place.category || 'sight') === currentCategory;
-            });
-
-            filteredLandmarks.forEach(place => {
-                const fallbackImg = 'https://images.unsplash.com/photo-1517411032315-54ef2cb783bb';
-                const imageSrc = place.img || fallbackImg;
-                const isSnack = place.category === 'snack';
-
-                const popupContent = `
-                    <div class="space-y-1.5 max-w-[200px]">
-                        <div class="relative group">
-                            <img src="${imageSrc}" onerror="this.src='${fallbackImg}'" class="w-full h-24 object-cover rounded-lg border border-slate-700/50 mb-1" alt="${place.name}" />
-                            <button onclick="triggerImageChange(${place.id}, event)" class="absolute top-1 right-1 bg-slate-900/80 hover:bg-slate-900 text-cyan-300 border border-slate-700 px-1.5 py-0.5 rounded text-[10px]">
-                                <i class="fa-solid fa-camera"></i> Change
-                            </button>
-                        </div>
-                        <b class="text-cyan-300 text-sm block leading-tight">${place.name}</b>
-                        <p class="text-xs text-slate-300">${place.address}</p>
-                        ${isSnack ? '<span class="inline-block mt-1 text-[10px] bg-amber-950 text-amber-400 border border-amber-800/50 px-2 py-0.5 rounded-full"><i class="fa-solid fa-mug-hot mr-1"></i>Snack & Coffee Spot</span>' : ''}
-                    </div>
-                `;
-
-                const marker = L.marker([place.lat, place.lng], { icon: defaultIcon }).addTo(map).bindPopup(popupContent);
-
-                marker.on('click', () => {
-                    if (activeMarker && activeMarker !== marker) activeMarker.setIcon(defaultIcon);
-                    marker.setIcon(selectedIcon);
-                    activeMarker = marker;
-                });
-
-                markersGroup.push(marker);
-
-                const card = document.createElement('div');
-                card.className = "bg-slate-950 border border-slate-800 hover:border-cyan-500/50 rounded-xl p-3 text-xs space-y-2 transition cursor-pointer flex items-center gap-3 relative group";
-                card.onclick = () => {
-                    map.flyTo([place.lat, place.lng], 16);
-                    if (activeMarker && activeMarker !== marker) activeMarker.setIcon(defaultIcon);
-                    marker.setIcon(selectedIcon);
-                    activeMarker = marker;
-                    marker.openPopup();
-                };
-                card.innerHTML = `
-                    <div class="relative shrink-0">
-                        <img src="${imageSrc}" onerror="this.src='${fallbackImg}'" class="w-12 h-12 rounded-lg object-cover border border-slate-800" alt="${place.name}" />
-                        <button onclick="triggerImageChange(${place.id}, event)" title="Change Picture" class="absolute -bottom-1 -right-1 bg-slate-900 border border-slate-700 text-cyan-300 rounded-full w-5 h-5 flex items-center justify-center text-[9px] hover:bg-cyan-600 hover:text-white transition">
-                            <i class="fa-solid fa-camera"></i>
-                        </button>
-                    </div>
-                    <div class="min-w-0 flex-1">
-                        <div class="flex items-center gap-1.5">
-                            <h4 class="font-bold text-cyan-400 truncate">${place.name}</h4>
-                            ${isSnack ? '<i class="fa-solid fa-mug-hot text-amber-400 text-[10px]" title="Snack & Coffee Spot"></i>' : ''}
-                        </div>
-                        <p class="text-slate-400 truncate">${place.address}</p>
-                    </div>
-                `;
-                list.appendChild(card);
-            });
-            filterLandmarks();
-        }
-
-        function filterLandmarks() {
-            const query = document.getElementById('search-input').value.toLowerCase();
-            const cards = document.getElementById('landmark-list').children;
-
-            const visibleLandmarks = landmarks.filter(place => {
-                if (currentCategory === 'all') return true;
-                return (place.category || 'sight') === currentCategory;
-            });
-
-            visibleLandmarks.forEach((place, index) => {
-                const matches = place.name.toLowerCase().includes(query) || place.address.toLowerCase().includes(query);
-                if (cards[index]) {
-                    cards[index].style.display = matches ? 'flex' : 'none';
-                }
-            });
-        }
-
-        renderLandmarks();
-    </script>
+    // Interactive pan function when card is clicked
+    function flyToLocation(lat, lng) {
+      map.flyTo([lat, lng], 16, { duration: 1.2 });
+    }
+  </script>
 </body>
 </html>
